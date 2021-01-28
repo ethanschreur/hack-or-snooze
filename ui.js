@@ -171,6 +171,7 @@ $(async function() {
    */
 
 	function generateStoryHTML(story, trash) {
+		// check if should include a star or a trash icon and act accordingly
 		let hostName = getHostName(story.url);
 
 		let isInFavorites = null;
@@ -182,7 +183,7 @@ $(async function() {
 		const farOrFas = isInFavorites
 			? '<i class="star fas fa-star"></i>'
 			: isInFavorites === false ? '<i class="star far fa-star"></i>' : '';
-		let showTrash = trash ? '<i class="trash fas fa-trash"></i>' : '';
+		const showTrash = trash ? '<i class="trash fas fa-trash"></i>' : '';
 		// render story markup
 		const storyMarkup = $(`
       <li id="${story.storyId}">
@@ -270,22 +271,27 @@ $(async function() {
 		}
 	}
 
+	// go to the user profile section hiding all others
 	$('#nav-user-profile').on('click', () => {
 		hideElements();
 		$('#user-profile').show();
 	});
 
+	// go to the favorites section hiding all others
 	$('#favorites').on('click', () => {
 		hideElements();
 		generateFavorites();
 		$favoritedArticles.show();
 	});
+
+	// go to the my stories section hiding all others
 	$('#my-stories').on('click', () => {
 		generateMyStories();
 		hideElements();
 		$myArticles.show();
 	});
 
+	// function that filters through stories generating the ones you favorited and adding them to the favorite section
 	async function generateFavorites() {
 		document.querySelector('#favorited-articles').innerHTML = '';
 		const storyListInstance = await StoryList.getStories();
@@ -305,6 +311,7 @@ $(async function() {
 		}
 	}
 
+	// function that filters through storis, generating the ones you made and adding them to my stories section
 	async function generateMyStories() {
 		document.querySelector('#my-articles').innerHTML = '';
 		const storyListInstance = await StoryList.getStories();
@@ -322,10 +329,10 @@ $(async function() {
 		}
 	}
 
-	// event for star click
+	// event for star and trash click
 	$('body').on('click', async (event) => {
-		// diff depending on if target is .star or .target
 		if ($(event.target).hasClass('star')) {
+			// toggle far and fas, all editFavorites function, and (if you are in favorites section), remove from favorites
 			await $(event.target).toggleClass('far');
 			await $(event.target).toggleClass('fas');
 			await currentUser.editFavorites($(event.target).parent().attr('id'));
@@ -336,6 +343,7 @@ $(async function() {
 				await $(event.target).parent().remove();
 			}
 		} else if ($(event.target).hasClass('trash')) {
+			// remove the story from the dom and call trashStory function
 			$(event.target).parent().remove();
 			currentUser.trashStory($(event.target).parent().attr('id'));
 		}
