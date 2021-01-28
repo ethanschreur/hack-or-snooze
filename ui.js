@@ -8,6 +8,9 @@ $(async function() {
 	const $ownStories = $('#my-articles');
 	const $navLogin = $('#nav-login');
 	const $navLogOut = $('#nav-logout');
+	const $userProfile = $('#user-profile');
+	const $favoritedArticles = $('#favorited-articles');
+	const $myArticles = $('#my-articles');
 
 	// global storyList variable
 	let storyList = null;
@@ -23,6 +26,7 @@ $(async function() {
    */
 
 	$loginForm.on('submit', async function(evt) {
+		$allStoriesList.hide();
 		evt.preventDefault(); // no page-refresh on submit
 
 		// grab the username and password
@@ -34,7 +38,9 @@ $(async function() {
 		// set the global user to the user instance
 		currentUser = userInstance;
 		syncCurrentUserToLocalStorage();
+
 		loginAndSubmitForm();
+		location.reload();
 	});
 
 	/**
@@ -70,7 +76,8 @@ $(async function() {
 		$('#favorites').hide();
 		$('#submit-story').hide();
 		$('#my-stories').hide();
-		$('#user-profile').show();
+		$('#user-profile').hide();
+		// $('#user-profile').show();
 		$navLogOut.hide();
 		// refresh the page, clearing memory
 		location.reload();
@@ -92,6 +99,7 @@ $(async function() {
    */
 
 	$('body').on('click', '#nav-all', async function() {
+		location.reload();
 		hideElements();
 		await generateStories();
 		$allStoriesList.show();
@@ -162,13 +170,24 @@ $(async function() {
    * A function to render HTML for an individual Story instance
    */
 
-	function generateStoryHTML(story) {
+	function generateStoryHTML(story, trash) {
 		let hostName = getHostName(story.url);
 
+		let isInFavorites = null;
+		try {
+			isInFavorites = currentUser.favorites.some((fav) => {
+				return fav.storyId === story.storyId;
+			});
+		} catch (e) {}
+		const farOrFas = isInFavorites
+			? '<i class="star fas fa-star"></i>'
+			: isInFavorites === false ? '<i class="star far fa-star"></i>' : '';
+		let showTrash = trash ? '<i class="trash fas fa-trash"></i>' : '';
 		// render story markup
 		const storyMarkup = $(`
       <li id="${story.storyId}">
-      <i class="star far fa-star"></i> 
+       ${farOrFas}
+       ${showTrash}
         <a class="article-link" href="${story.url}" target="a_blank">
         <strong>${story.title}</strong>
         </a>
@@ -190,7 +209,10 @@ $(async function() {
 			$filteredArticles,
 			$ownStories,
 			$loginForm,
-			$createAccountForm
+			$createAccountForm,
+			$userProfile,
+			$myArticles,
+			$favoritedArticles
 		];
 		elementsArr.forEach(($elem) => $elem.hide());
 	}
@@ -204,6 +226,7 @@ $(async function() {
 		$('#favorites').show();
 		$('#submit-story').show();
 		$('#my-stories').show();
+		$('#user-profile').hide();
 	}
 
 	/* simple function to pull the hostname from a URL */
@@ -225,7 +248,7 @@ $(async function() {
 
 	// event listener for submit story
 	$('#submit-story').on('click', () => {
-		console.log('did');
+		hideElements();
 		$('#submit-form').show();
 	});
 
@@ -247,10 +270,74 @@ $(async function() {
 		}
 	}
 
+	$('#nav-user-profile').on('click', () => {
+		hideElements();
+		$('#user-profile').show();
+	});
+
+	$('#favorites').on('click', () => {
+		hideElements();
+		generateFavorites();
+		$favoritedArticles.show();
+	});
+	$('#my-stories').on('click', () => {
+		generateMyStories();
+		hideElements();
+		$myArticles.show();
+	});
+
+	async function generateFavorites() {
+		document.querySelector('#favorited-articles').innerHTML = '';
+		const storyListInstance = await StoryList.getStories();
+		// update our global variable
+		storyList = storyListInstance;
+		// empty out that part of the page
+		$allStoriesList.empty();
+		const filterredList = storyList.stories.filter(function(indStory) {
+			return currentUser.favorites.some((value) => {
+				return value.storyId === indStory.storyId;
+			});
+		});
+		// loop through all of our stories and generate HTML for them
+		for (let story of filterredList) {
+			const result = generateStoryHTML(story);
+			$favoritedArticles.append(result);
+		}
+	}
+
+	async function generateMyStories() {
+		document.querySelector('#my-articles').innerHTML = '';
+		const storyListInstance = await StoryList.getStories();
+		// update our global variable
+		storyList = storyListInstance;
+		// empty out that part of the page
+		$allStoriesList.empty();
+		const filterredList = storyList.stories.filter(function(indStory) {
+			return indStory.username === currentUser.username;
+		});
+		// loop through all of our stories and generate HTML for them
+		for (let story of filterredList) {
+			const result = generateStoryHTML(story, true);
+			$myArticles.append(result);
+		}
+	}
+
 	// event for star click
-	$('.star').on('click', (event) => {
-		$(event.target).toggleClass('far');
-		$(event.target).toggleClass('fas');
-		currentUser.editFavorites($(event.target).parent().attr('id'));
+	$('body').on('click', async (event) => {
+		// diff depending on if target is .star or .target
+		if ($(event.target).hasClass('star')) {
+			await $(event.target).toggleClass('far');
+			await $(event.target).toggleClass('fas');
+			await currentUser.editFavorites($(event.target).parent().attr('id'));
+			if (
+				$(event.target).hasClass('far') &&
+				$(event.target).parent().parent().attr('id') === 'favorited-articles'
+			) {
+				await $(event.target).parent().remove();
+			}
+		} else if ($(event.target).hasClass('trash')) {
+			$(event.target).parent().remove();
+			currentUser.trashStory($(event.target).parent().attr('id'));
+		}
 	});
 });

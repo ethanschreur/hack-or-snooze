@@ -26,7 +26,6 @@ class StoryList {
 	static async getStories() {
 		// query the /stories endpoint (no auth required)
 		const response = await axios.get(`${BASE_URL}/stories`);
-
 		// turn the plain old story objects from the API into instances of the Story class
 		const stories = response.data.stories.map((story) => new Story(story));
 
@@ -47,7 +46,6 @@ class StoryList {
 		// TODO - Implement this functions!
 		// this function should return the newly created story so it can be used in
 		// the script.js file where it will be appended to the DOM
-		console.log('adding story');
 		return await axios.post(`${BASE_URL}/stories`, { token: user.loginToken, story: newStory });
 	}
 }
@@ -55,23 +53,6 @@ class StoryList {
 /**
  * Class to represent a single story.
  */
-
-class Story {
-	/**
-   * The constructor is designed to take an object for better readability / flexibility
-   * - storyObj: an object that has story properties in it
-   */
-
-	constructor(storyObj) {
-		this.author = storyObj.author;
-		this.title = storyObj.title;
-		this.url = storyObj.url;
-		this.username = storyObj.username;
-		this.storyId = storyObj.storyId;
-		this.createdAt = storyObj.createdAt;
-		this.updatedAt = storyObj.updatedAt;
-	}
-}
 
 /**
  * The User class to primarily represent the current user.
@@ -99,18 +80,6 @@ class User {
    * - password: a new password
    * - name: the user's full name
    */
-
-	//  toggle whether or not the story is in favorites
-	async editFavorites(storyId) {
-		console.log(storyId);
-		console.log(this.loginToken);
-		try {
-			await axios.delete(`${BASE_URL}/users/${this.username}/favorites/${storyId}`, { token: this.loginToken });
-		} catch (e) {
-			console.log('error');
-			axios.post(`${BASE_URL}/users/${this.username}/favorites/${storyId}`, { token: this.loginToken });
-		}
-	}
 
 	static async create(username, password, name) {
 		const response = await axios.post(`${BASE_URL}/signup`, {
@@ -184,5 +153,56 @@ class User {
 		existingUser.favorites = response.data.user.favorites.map((s) => new Story(s));
 		existingUser.ownStories = response.data.user.stories.map((s) => new Story(s));
 		return existingUser;
+	}
+
+	//  toggle whether or not the story is in favorites
+	async editFavorites(storyId) {
+		// check if story is in favorites
+		// if it is in favorites: delete from database and from this.favs, else add the story to both
+		const isInFavorites = this.favorites.some((story) => {
+			return story.storyId === storyId;
+		});
+		if (isInFavorites) {
+			await axios.delete(`${BASE_URL}/users/${this.username}/favorites/${storyId}`, {
+				params: {
+					token: this.loginToken
+				}
+			});
+			// remove from this.favs
+			const foundIndex = this.favorites.findIndex((story) => {
+				return story.storyId === storyId;
+			});
+			this.favorites.splice(foundIndex - 1);
+		} else {
+			await axios.post(`${BASE_URL}/users/${this.username}/favorites/${storyId}`, {
+				token: this.loginToken
+			});
+			const storyObj = (await axios.get(`${BASE_URL}/stories/${storyId}`)).data;
+			const instStory = new Story(storyObj.story);
+			this.favorites.push(instStory);
+		}
+
+		// location.reload();
+	}
+
+	async trashStory(storyId) {
+		await axios.delete(`${BASE_URL}/stories/${storyId}`, { params: { token: this.loginToken } });
+	}
+}
+
+class Story {
+	/**
+   * The constructor is designed to take an object for better readability / flexibility
+   * - storyObj: an object that has story properties in it
+   */
+
+	constructor(storyObj) {
+		this.author = storyObj.author;
+		this.title = storyObj.title;
+		this.url = storyObj.url;
+		this.username = storyObj.username;
+		this.storyId = storyObj.storyId;
+		this.createdAt = storyObj.createdAt;
+		this.updatedAt = storyObj.updatedAt;
 	}
 }
